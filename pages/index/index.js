@@ -1,19 +1,19 @@
-var app = getApp()
-var temp = []
-var serviceId = "0000ffe0-0000-1000-8000-00805f9b34fb"
-var characteristicId = "0000ffe1-0000-1000-8000-00805f9b34fb"
+var app = getApp();
+var temp = [];
+var serviceId = "0000ffe0-0000-1000-8000-00805f9b34fb";
+var characteristicId = "0000ffe1-0000-1000-8000-00805f9b34fb";
 Page({
   data: {
     isbluetoothready: false,
-    defaultSize: 'default',
-    primarySize: 'default',
-    warnSize: 'default',
+    defaultSize: "default",
+    primarySize: "default",
+    warnSize: "default",
     disabled: false,
     plain: false,
     loading: false,
     searchingstatus: false,
-    receivedata: '',
-    onreceiving: false
+    receivedata: "",
+    onreceiving: false,
   },
   onLoad: function () {
     // var str = "A13";
@@ -31,126 +31,146 @@ Page({
     //console.log(dataView.getUint8(1))
   },
   switchBlueTooth: function () {
-    var that = this
+    var that = this;
 
     that.setData({
       isbluetoothready: !that.data.isbluetoothready,
-    })
+    });
 
     if (that.data.isbluetoothready) {
       wx.openBluetoothAdapter({
+        // wx.getConnectedBluetoothDevices
+
         success: function (res) {
-          console.log("初始化蓝牙适配器成功")
+          console.log("初始化蓝牙适配器成功");
           wx.onBluetoothAdapterStateChange(function (res) {
-            console.log("蓝牙适配器状态变化", res)
+            console.log("蓝牙适配器状态变化", res);
             that.setData({
               isbluetoothready: res.available,
-              searchingstatus: res.discovering
-            })
-          })
-          wx.onBluetoothDeviceFound(function (devices) {
-            console.log(devices)
-            temp.push(devices)
-            that.setData({
-              devices: temp
-            })
-            console.log('发现新蓝牙设备')
-            console.log('设备id' + devices.deviceId)
-            console.log('设备name' + devices.name)
-          })
-          wx.onBLECharacteristicValueChange(function (characteristic) {
-            console.log('characteristic value comed:')
-            let buffer = characteristic.value
-            let dataView = new DataView(buffer)
-            console.log("接收字节长度:" + dataView.byteLength)
-            var str = ""
-            for (var i = 0; i < dataView.byteLength; i++) {
-              str += String.fromCharCode(dataView.getUint8(i))
+              searchingstatus: res.discovering,
+            });
+          });
+          wx.onBluetoothDeviceFound(function (res) {
+            // same device triggers multiple times
+            const maxCount = 10;
+            if (temp.length >= maxCount) {
+              console.log("设备太多只显示", maxCount, "个");
+              wx.stopBluetoothDevicesDiscovery();
+              return;
             }
-            str=getNowFormatDate()+"收到数据:"+str;
+
+            // filter empty name devices
+            devices = res.devices.filter(
+              (d) =>
+                d.name != "" && !temp.find((td) => td.deviceId == d.deviceId)
+            );
+
+            let count = maxCount - temp.length;
+            for (var i = 0; i < maxCount && i < devices.length; i++) {
+              let device = devices[i];
+              console.log("发现新蓝牙设备");
+              console.log("Device Found", device);
+              temp.push(device);
+            }
+
+            that.setData({
+              devices: temp,
+            });
+          });
+          wx.onBLECharacteristicValueChange(function (characteristic) {
+            console.log("characteristic value comed:");
+            let buffer = characteristic.value;
+            let dataView = new DataView(buffer);
+            console.log("接收字节长度:" + dataView.byteLength);
+            var str = "";
+            for (var i = 0; i < dataView.byteLength; i++) {
+              str += String.fromCharCode(dataView.getUint8(i));
+            }
+            str = getNowFormatDate() + "收到数据:" + str;
             that.setData({
               receivedata: that.data.receivedata + "\n" + str,
-              onreceiving: true
-            })
-          })
+              onreceiving: true,
+            });
+          });
         },
         fail: function (res) {
-          console.log("初始化蓝牙适配器失败")
+          wx.closeBluetoothAdapter();
+          console.log("初始化蓝牙适配器失败", res);
           wx.showModal({
-            title: '提示',
-            content: '请检查手机蓝牙是否打开',
+            title: "提示",
+            content: "请检查手机蓝牙是否打开",
             success: function (res) {
               that.setData({
                 isbluetoothready: false,
-                searchingstatus: false
-              })
-            }
-          })
-        }
-      })
+                searchingstatus: false,
+              });
+            },
+          });
+        },
+      });
     } else {
-      temp = []
+      temp = [];
       //先关闭设备连接
       wx.closeBLEConnection({
         deviceId: that.data.connectedDeviceId,
         complete: function (res) {
-          console.log(res)
+          console.log(res);
           that.setData({
             deviceconnected: false,
-            connectedDeviceId: ""
-          })
-        }
-      })
+            connectedDeviceId: "",
+          });
+        },
+      });
       wx.closeBluetoothAdapter({
         success: function (res) {
-          console.log(res)
+          console.log(res);
           that.setData({
             isbluetoothready: false,
             deviceconnected: false,
             devices: [],
             searchingstatus: false,
-            receivedata: ''
-          })
+            receivedata: "",
+          });
         },
         fail: function (res) {
           wx.showModal({
-            title: '提示',
-            content: '请检查手机蓝牙是否打开',
+            title: "提示",
+            content: "请检查手机蓝牙是否打开",
             success: function (res) {
               that.setData({
-                isbluetoothready: false
-              })
-            }
-          })
-        }
-      })
+                isbluetoothready: false,
+              });
+            },
+          });
+        },
+      });
     }
   },
   searchbluetooth: function () {
-    temp = []
-    var that = this
+    temp = [];
+    var that = this;
     if (!that.data.searchingstatus) {
-      var that = this
+      var that = this;
       wx.startBluetoothDevicesDiscovery({
         success: function (res) {
-          console.log("开始搜索附近蓝牙设备")
-          console.log(res)
+          console.log("开始搜索附近蓝牙设备");
+          console.log(res);
           that.setData({
-            searchingstatus: !that.data.searchingstatus
-          })
-        }
-      })
+            searchingstatus: !that.data.searchingstatus,
+          });
+        },
+      });
     } else {
       wx.stopBluetoothDevicesDiscovery({
         success: function (res) {
-          console.log("停止蓝牙搜索")
-          console.log(res)
-        }
-      })
+          console.log("停止蓝牙搜索");
+          console.log(res);
+        },
+      });
     }
   },
   connectTO: function (e) {
-    var that = this
+    var that = this;
 
     if (that.data.deviceconnected) {
       wx.notifyBLECharacteristicValueChanged({
@@ -159,40 +179,40 @@ Page({
         serviceId: serviceId,
         characteristicId: characteristicId,
         success: function (res) {
-          console.log("停用notify 功能")
-        }
-      })
+          console.log("停用notify 功能");
+        },
+      });
       wx.closeBLEConnection({
         deviceId: e.currentTarget.id,
         complete: function (res) {
-          console.log("断开设备")
-          console.log(res)
+          console.log("断开设备");
+          console.log(res);
           that.setData({
             deviceconnected: false,
             connectedDeviceId: "",
-            receivedata: ""
-          })
-        }
-      })
+            receivedata: "",
+          });
+        },
+      });
     } else {
       wx.showLoading({
-        title: '连接蓝牙设备中...',
-      })
+        title: "连接蓝牙设备中...",
+      });
       wx.createBLEConnection({
         deviceId: e.currentTarget.id,
         success: function (res) {
-          wx.hideLoading()
+          wx.hideLoading();
           wx.showToast({
-            title: '连接成功',
-            icon: 'success',
-            duration: 1000
-          })
-          console.log("连接设备成功")
-          console.log(res)
+            title: "连接成功",
+            icon: "success",
+            duration: 1000,
+          });
+          console.log("连接设备成功");
+          console.log(res);
           that.setData({
             deviceconnected: true,
-            connectedDeviceId: e.currentTarget.id
-          })
+            connectedDeviceId: e.currentTarget.id,
+          });
 
           wx.notifyBLECharacteristicValueChanged({
             state: true, // 启用 notify 功能
@@ -200,40 +220,40 @@ Page({
             serviceId: serviceId,
             characteristicId: characteristicId,
             success: function (res) {
-              console.log("启用notify")
-            }
-          })
+              console.log("启用notify");
+            },
+          });
         },
         fail: function (res) {
-          wx.hideLoading()
+          wx.hideLoading();
           wx.showToast({
-            title: '连接设备失败',
-            icon: 'success',
-            duration: 1000
-          })
-          console.log("连接设备失败")
-          console.log(res)
+            title: "连接设备失败",
+            icon: "success",
+            duration: 1000,
+          });
+          console.log("连接设备失败");
+          console.log(res);
           that.setData({
-            connected: false
-          })
-        }
-      })
+            connected: false,
+          });
+        },
+      });
       wx.stopBluetoothDevicesDiscovery({
         success: function (res) {
-          console.log("停止蓝牙搜索")
-          console.log(res)
-        }
-      })
+          console.log("停止蓝牙搜索");
+          console.log(res);
+        },
+      });
     }
   },
   formSubmit: function (e) {
-    console.log('form发生了submit事件，携带数据为：', e.detail.value.senddata)
+    console.log("form发生了submit事件，携带数据为：", e.detail.value.senddata);
     var senddata = e.detail.value.senddata;
-    var that = this
-    let buffer = new ArrayBuffer(senddata.length)
-    let dataView = new DataView(buffer)
+    var that = this;
+    let buffer = new ArrayBuffer(senddata.length);
+    let dataView = new DataView(buffer);
     for (var i = 0; i < senddata.length; i++) {
-      dataView.setUint8(i, senddata.charAt(i).charCodeAt())
+      dataView.setUint8(i, senddata.charAt(i).charCodeAt());
     }
     wx.writeBLECharacteristicValue({
       deviceId: that.data.connectedDeviceId,
@@ -241,17 +261,15 @@ Page({
       characteristicId: characteristicId,
       value: buffer,
       success: function (res) {
-        console.log(res)
-        console.log('writeBLECharacteristicValue success', res.errMsg)
-      }
-    })
+        console.log(res);
+        console.log("writeBLECharacteristicValue success", res.errMsg);
+      },
+    });
   },
   formReset: function () {
-    console.log('form发生了reset事件')
-  }
-})
-
-
+    console.log("form发生了reset事件");
+  },
+});
 
 function getNowFormatDate() {
   var date = new Date();
@@ -265,8 +283,17 @@ function getNowFormatDate() {
   if (strDate >= 0 && strDate <= 9) {
     strDate = "0" + strDate;
   }
-  var currentdate = date.getFullYear() + seperator1 + month + seperator1 + strDate
-    + " " + date.getHours() + seperator2 + date.getMinutes()
-    + seperator2 + date.getSeconds();
+  var currentdate =
+    date.getFullYear() +
+    seperator1 +
+    month +
+    seperator1 +
+    strDate +
+    " " +
+    date.getHours() +
+    seperator2 +
+    date.getMinutes() +
+    seperator2 +
+    date.getSeconds();
   return currentdate;
 }
